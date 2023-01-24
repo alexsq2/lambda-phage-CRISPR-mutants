@@ -146,15 +146,14 @@ for file_pair in total_file_list_pairs:
         col_write = 'unassigned'
         if file_dict[sequence]['mismatches'] == 1 and file_dict[sequence]['deletion'] == False :
             col_write = mismatch_pos_dict[sequence[  file_dict[sequence]['mismatch1']       ]]
-
         if file_dict[sequence]['mismatches'] > 1 and file_dict[sequence]['deletion'] == True:
             col_write = 4
         if file_dict[sequence]['mismatches'] > 1 and file_dict[sequence]['deletion'] == False:
             multi_mismatch_array[file_dict[sequence]['mismatch1']] += file_dict[sequence]['fraction']
-
-
         if col_write != 'unassigned':
             worksheet.write(file_dict[sequence]['mismatch1'] + row, col_write + column, file_dict[sequence]['fraction'])
+        for position in range(len(multi_mismatch_array)):
+            worksheet.write(position + row, 7, multi_mismatch_array[position])
 
 
     chart = workbook.add_chart({'type': 'column', 'subtype': 'stacked'})
