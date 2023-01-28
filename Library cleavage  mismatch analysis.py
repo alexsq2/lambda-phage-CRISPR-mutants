@@ -6,6 +6,7 @@
 
 import xlsxwriter
 import glob
+import statistics
 
 # take two sequences that are supposed to be reverse complement of each other, from stack overflow
 def reverse_comp(in_sequence):
@@ -15,7 +16,7 @@ def reverse_comp(in_sequence):
     return  reverse_complement
 
 # takes in a list with file pairs and outputs a dictionary with info on each sequence
-def file_pair_analysis(file_pair, control = False):
+def file_pair_analysis(file_pair, random_list, control = False):
 
     sequence_lines = 0  # this represents the total number of valid sequences found, valid = R1R2 match
     seq_count_lib = {}  # defining this library to add sequences with info to
@@ -41,21 +42,20 @@ def file_pair_analysis(file_pair, control = False):
         if lines_R1[line_num].find(to_find1_R1) != -1 and lines_R1[line_num].find(to_find2_R1) != -1:
             temp_sequence_R1 = lines_R1[line_num][lines_R1[line_num].find(to_find1_R1) + len(to_find1_R1): lines_R1[line_num].find(to_find2_R1)]
             line_count_r1 += 1
-            # print('true')
+            # print(temp_sequence_R1, 'r1 line')
             # print(temp_sequence_R1)
 
         if lines_R2[line_num].find(to_find1_R2) != -1 and lines_R2[line_num].find(to_find2_R2) != -1:
-            temp_sequence_R2 = lines_R2[line_num][
-                               lines_R2[line_num].find(to_find1_R2) + len(to_find1_R2): lines_R2[line_num].find(
-                                   to_find2_R2)]
-            # print(temp_sequence_R2, temp_sequence_R1)
+            temp_sequence_R2 = lines_R2[line_num][lines_R2[line_num].find(to_find1_R2) + len(to_find1_R2): lines_R2[line_num].find(to_find2_R2)]
+            # print(temp_sequence_R2, 'r2 line')
             line_count_r2 += 1
+
 
         if len(temp_sequence_R1) == len(temp_sequence_R2) and len(temp_sequence_R1) > 20 and len(
                 temp_sequence_R2) > 20:  # if they are same length, rev complement R2, match with R1
             same_length_sequences += 1
 
-            if reverse_comp(temp_sequence_R2) == temp_sequence_R1 :
+            if temp_sequence_R2 == reverse_comp(temp_sequence_R1) :
                 # print('found R1R2 pair')
                 matching_sequences += 1
                 sequence_lines += 1
@@ -69,6 +69,7 @@ def file_pair_analysis(file_pair, control = False):
                     mm_bin_1 = 'NA'
                     mm_pos_2 = 'NA'
                     mm_bin_2 = 'NA'
+
 
                     for x in range(len(temp_sequence)):  # counting total mismatches
                         if temp_sequence[x] != perfect_target[x]:
@@ -86,12 +87,22 @@ def file_pair_analysis(file_pair, control = False):
                     if mm_count_temp < 3:
                         seq_count_lib[temp_sequence] = {'count': 1, 'length': len(temp_sequence),
                              'mismatches': mm_count_temp, 'mismatch1': mm_pos_1,'mismatch2' : mm_pos_2,
-                                    'mm_bin_1' : mm_bin_1, 'mm_bin_2': mm_bin_2}
+                                    'mm_bin_1' : mm_bin_1, 'mm_bin_2': mm_bin_2, 'instances': 1}
+                        seq_count_lib[temp_sequence]['random'] = temp_sequence in random_list
+
+                    if mm_count_temp > 3 and temp_sequence in random_list:
+                        seq_count_lib[temp_sequence] = {'count': 1, 'length': len(temp_sequence),
+                                                        'mismatches': mm_count_temp, 'mismatch1': mm_pos_1,
+                                                        'mismatch2': mm_pos_2,
+                                                        'mm_bin_1': mm_bin_1, 'mm_bin_2': mm_bin_2, 'instances': 1}
+                        seq_count_lib[temp_sequence]['random'] = temp_sequence in random_list
+
                 elif len(temp_sequence) == len(perfect_target):
                     seq_count_lib[temp_sequence]['count'] = seq_count_lib[temp_sequence]['count'] + 1
 
     print(matching_sequences, 'matching sequences')
     print(sequence_lines)
+    print(same_length_sequences, 'same length sequences')
 
 
     for item in seq_count_lib:
@@ -108,67 +119,137 @@ def file_pair_analysis(file_pair, control = False):
 
     if control == False:
         for item in seq_count_lib:
-            if item in analysis_control:
-                seq_count_lib[item]['enrichment'] = seq_count_lib[item]['fraction'] / analysis_control[item]['fraction']
+            if item in analysis_control_lib_combined:
+                seq_count_lib[item]['enrichment'] = seq_count_lib[item]['fraction'] / analysis_control_lib_combined[item]['fraction']
             else:
                 seq_count_lib[item]['enrichment'] = 1
+
+        for item in seq_count_lib:
+            if item in analysis_control_lib_combined:
+                seq_count_lib[item]['z_numerator'] = seq_count_lib[item]['fraction'] - analysis_control_lib_combined[item]['fraction']
+            else:
+                seq_count_lib[item]['z_numerator'] = 0
+        #now making a z-score value using stdev of all z_numberators
+
+        fraction_sums = []
+        for item in seq_count_lib:
+            fraction_sums.append(seq_count_lib[item]['fraction'])
+        standard_dev_exp = statistics.stdev(fraction_sums)
+
+        for item in seq_count_lib:
+            seq_count_lib[item]['z-score'] = seq_count_lib[item]['z_numerator'] / standard_dev_exp
+
 
     return seq_count_lib
 
 
-workbook = xlsxwriter.Workbook('(top) data_W_library.xlsx')
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#start of actual analysis
+#data that is specific for the target being analyzed
+workbook = xlsxwriter.Workbook('(top) data_L_library.xlsx')
+
+perfect_target = 'TTTGTACTGTCCACGCCGACGGAA' #FORWARD orientation
+
+to_find1_R1 = 'CCGAGCTTGACCA'  #extract the target sequence between these two sequences from the R1 file
+to_find2_R1 = 'ATCCTGAAGCAC'
+
+to_find1_R2 = 'AGGAT'  #extract the target sequence between these two sequences from the R2 file
+to_find2_R2 = 'TGGTC'
+random_sequences_list = ['GCATTCTTATTAATACATTTGAAA','CGCGCCCAACTGACGCTAGGCAAG','TCAGTGCAGGCTCCCGTGTTAGGA','TAAGGGTAAACATACAAGTCGATA','CATCCAGCACTCTACGGTTCCTCC']
 
 complement_list = [['A', 'T'], ['T', 'A'], ['C', 'G'], ['G', 'C']]
 target_regions = {'PAM': [0,1,2,3], 'seed': [4,5,6,7,8,9], 'mid': [10,11,12,13,14,15,16], 'distal':[17,18,19,20,21,22,23] }
 
-perfect_target = 'TTTACGGCCACTTCCGTGTCTGAC' #FORWARD orientation
+# selecting files for control sample, which the experimental samples will be compared with
 
-to_find1_R1 = 'GCTTGACCA'  #extract the target sequence between these two sequences from the R1 file
-to_find2_R1 = 'ATCCTGAAGC'
-
-to_find1_R2 = 'GCTTCAGGAT'  #extract the target sequence between these two sequences from the R2 file
-to_find2_R2 = 'TGGTCAAGC'
-# selecting files to analyze
 
 control_file_list = []
-control_file_list += glob.glob('As_C1_supercoil_gene_W*')
-# control_file_list += glob.glob('Fn_10mM_1min_supercoil*')
+control_file_list += glob.glob('L_Fn_Supercoil_10_Control*')
 control_file_list_pairs = []
 
 control_file_list_length_half = int(len(control_file_list) / 2)
 for x in range(control_file_list_length_half):
     control_file_list_pairs.append([control_file_list[2 * x]] + [control_file_list[2 * x + 1]])
-print(control_file_list_pairs)
-analysis_control = file_pair_analysis(control_file_list_pairs[0], control = True) #analyzing control files, making library
+print(control_file_list_pairs[0])
+
+analysis_control_lib_combined = {}
+for pair in control_file_list_pairs:
+    print(pair)
+    control_lib = file_pair_analysis(pair, random_sequences_list, control = True) #analyzing control files, making library
+    if len(control_lib) > 2400:
+        for item in control_lib:
+            if item in analysis_control_lib_combined:
+                analysis_control_lib_combined[item]['fraction'] += analysis_control_lib_combined[item]['fraction']
+                analysis_control_lib_combined[item]['instances'] += 1
+            else:
+                analysis_control_lib_combined[item] = control_lib[item]
 
 
+for item in analysis_control_lib_combined:
+    analysis_control_lib_combined[item]['fraction'] = analysis_control_lib_combined[item]['fraction']/analysis_control_lib_combined[item]['instances']
+
+
+
+#collecting experimental samples, arranging so 1minute and 30minute samples are next to each other
+exp_file_list_30min = []
+exp_file_list_1min = []
 exp_file_list = []
-# exp_file_list += glob.glob('As_1mM_1min_supercoil_gene_L_*')
-exp_file_list += glob.glob('*As_1*')
-exp_file_list += glob.glob('*Fn_1*')
-exp_file_list += glob.glob('*Lb_1*')
-exp_file_list = [item for item in exp_file_list if 'Li' not in item]
-exp_file_list = [item for item in exp_file_list if 'C1' not in item]
-exp_file_list = [item for item in exp_file_list if 'C2' not in item]
+# exp_file_list_1min += glob.glob('L_As_Supercoil_1_1*')
+# exp_file_list_30min += glob.glob('L_As_Supercoil_1_30*')
+# exp_file_list_1min += glob.glob('L_As_Supercoil_2_1*')
+# exp_file_list_30min += glob.glob('L_As_Supercoil_2_30*')
+# exp_file_list_1min += glob.glob('L_As_Supercoil_5_1*')
+# exp_file_list_30min += glob.glob('L_As_Supercoil_5_30*')
+# exp_file_list_1min += glob.glob('L_As_Supercoil_10_1*')
+# exp_file_list_30min += glob.glob('L_As_Supercoil_10_30*')
+exp_file_list_1min += glob.glob('L_Lb_Supercoil_1_1*')
+exp_file_list_30min += glob.glob('L_Lb_Supercoil_1_30*')
+exp_file_list_1min += glob.glob('L_Lb_Supercoil_2_1*')
+exp_file_list_30min += glob.glob('L_Lb_Supercoil_2_30*')
+exp_file_list_1min += glob.glob('L_Lb_Supercoil_5_1*')
+exp_file_list_30min += glob.glob('L_Lb_Supercoil_5_30*')
+exp_file_list_1min += glob.glob('L_Lb_Supercoil_10_1*')
+exp_file_list_30min += glob.glob('L_Lb_Supercoil_10_30*')
 
+# exp_file_list_1min += glob.glob('*1min*')
+# exp_file_list_30min += glob.glob('*30min*')
 
+exp_file_list_1min = [item for item in exp_file_list_1min if 'Li' not in item]
+exp_file_list_1min = [item for item in exp_file_list_1min if 'C1' not in item]
+exp_file_list_1min = [item for item in exp_file_list_1min if 'C2' not in item]
 
+exp_file_list_30min = [item for item in exp_file_list_30min if 'Li' not in item]
+exp_file_list_30min = [item for item in exp_file_list_30min if 'C1' not in item]
+exp_file_list_30min = [item for item in exp_file_list_30min if 'C2' not in item]
 
-# exp_file_list += glob.glob('*Ni*')
-# exp_file_list += glob.glob('As_1mM_1min_supercoil_gene_L*')
+print(exp_file_list_1min)
 
-# exp_file_list += glob.glob('Fn_1mM_1min_supercoil*')
+file_list_length_half = int(len(exp_file_list_1min) / 2)
+total_file_list_pairs_1min = [] #this list will contain pairs of files ordered by their order in total file list, check the list is in order
+total_file_list_pairs_30min = []
 
-file_list_length_half = int(len(exp_file_list) / 2)
-total_file_list_pairs = [] #this list will contain pairs of files ordered by their order in total file list, check the list is in order
 
 for x in range(file_list_length_half):
-    total_file_list_pairs.append([exp_file_list[2 * x]] + [exp_file_list[2 * x + 1]])
-print(total_file_list_pairs)
-all_sample_info = [] # this will be written on the last sheet containing info for all of the samples processed
+    total_file_list_pairs_1min.append([exp_file_list_1min[2 * x]] + [exp_file_list_1min[2 * x + 1]])
+    total_file_list_pairs_30min.append([exp_file_list_30min[2 * x]] + [exp_file_list_30min[2 * x + 1]])
+
+
+
+total_file_list_pairs = []
+if len(total_file_list_pairs_1min) == len(total_file_list_pairs_30min):
+    for pos in range(len(total_file_list_pairs_1min)):
+        total_file_list_pairs.append(total_file_list_pairs_1min[pos])
+        total_file_list_pairs.append(total_file_list_pairs_30min[pos])
+
+for pos in range(len(total_file_list_pairs)):
+    print(total_file_list_pairs[pos])
+
+
+all_sample_info = [] # this will be written on the firstsheet containing info for all of the samples processed
 
 custom_format = workbook.add_format({'num_format': ';;;'})
 
+#making worksheets containing info from all of the samples
 worksheet_all = workbook.add_worksheet('All info')
 
 worksheet_single_heat = workbook.add_worksheet('Singles')
@@ -177,6 +258,10 @@ single_heat_row = 2
 worksheet_double_heat = workbook.add_worksheet('Doubles')
 double_heat_row = 2
 
+counter_1min_30min = 0 #keeps track of alternating 1min and 30minute samples for heat maps
+
+row_random_seq = 0
+
 for pair in total_file_list_pairs:
     file_name = pair[0][0:22]
     print(file_name)
@@ -184,8 +269,9 @@ for pair in total_file_list_pairs:
     worksheet = workbook.add_worksheet(file_name)
 
     # Add the worksheet data to be plotted.
-    dictionary_file_pair_analysis = file_pair_analysis(pair) #analyzing experimental files, making library
+    dictionary_file_pair_analysis = file_pair_analysis(pair,random_sequences_list) #analyzing experimental files, making library
     print(dictionary_file_pair_analysis)
+
     data = []
     for item in dictionary_file_pair_analysis:
         data.append(dictionary_file_pair_analysis[item]['fraction'])
@@ -262,10 +348,20 @@ for pair in total_file_list_pairs:
         if dictionary_file_pair_analysis[item]['mismatch1'] != 'NA' and dictionary_file_pair_analysis[item]['mismatch2'] != 'NA':
             grid24_list[dictionary_file_pair_analysis[item]['mismatch1']][dictionary_file_pair_analysis[item]['mismatch2']] += dictionary_file_pair_analysis[item]['enrichment']
     print(grid24_list)
-    for row in range(len(grid24_list)):
-        for column in range(len(grid24_list)):
-            worksheet.write(row + 1, column + 25, grid24_list[row][column], custom_format)
-            worksheet_double_heat.write(row + 1 + double_heat_row, column, grid24_list[row][column], custom_format)
+
+
+    if counter_1min_30min == 0: # 1 minutes samples
+        for row in range(len(grid24_list)):
+            for column in range(len(grid24_list)):
+                worksheet.write(row + 1, column + 25, grid24_list[row][column], custom_format)
+                worksheet_double_heat.write(row + 1 + double_heat_row, column*2, grid24_list[row][column], custom_format)
+
+    if counter_1min_30min == 1:
+        for row in range(len(grid24_list)):
+            for column in range(len(grid24_list)):
+                worksheet.write(row + 1, column + 25, grid24_list[row][column], custom_format)
+                worksheet_double_heat.write(row + 1 + double_heat_row, (column * 2) + 1, grid24_list[row][column],
+                                            custom_format)
 
     row = 0
     column = 25
@@ -274,29 +370,27 @@ for pair in total_file_list_pairs:
             worksheet.write(double_heat_row -1, column, num)
             column += 1
 
-    worksheet_double_heat.conditional_format(double_heat_row + 1, 0, double_heat_row + 24, 23,
-                                             {'type': '2_color_scale', 'min_color': 'white', 'max_color': 'red'})
+
 
 
     for num in range(1000):
-        worksheet_double_heat.set_row(num, 15)
-    worksheet_double_heat.set_column(0, 100, 2.2)
+        worksheet_double_heat.set_row(num, 45)
+    worksheet_double_heat.set_column(0, 100, 3.4)
 
     row = 0
     column = 0
     for num in range(-4,21):
         if num != 0:
-            worksheet_double_heat.write(row + double_heat_row, column, num)
+            worksheet_double_heat.write(row + double_heat_row, column * 2, str(num))
             column += 1
     for num in range(-4,21):
         if num != 0:
-            worksheet_double_heat.write(row + double_heat_row + 1, 25, num)
+            worksheet_double_heat.write(row + double_heat_row + 1, 48, str(num))
             row += 1
 
     worksheet_double_heat.write(double_heat_row - 1, 0, file_name)
-    double_heat_row += 27
-
-
+    worksheet_double_heat.conditional_format(0, 0, 1000, 1000,
+                                             {'type': '2_color_scale', 'min_color': 'white', 'max_color': 'red'})
 
 
 #making heat map for single mismatches only
@@ -319,33 +413,48 @@ for pair in total_file_list_pairs:
                                 dictionary_file_pair_analysis[item]['mismatch1'] + column,
                                 dictionary_file_pair_analysis[item]['enrichment'],
                                 custom_format)
-        if dictionary_file_pair_analysis[item]['mismatches'] == 1:
-            if dictionary_file_pair_analysis[item]['mismatch1'] != 'NA':
-                worksheet_single_heat.write(base_num_dict[   item[dictionary_file_pair_analysis[item]['mismatch1']]   ] + single_heat_row + 1,
-                                dictionary_file_pair_analysis[item]['mismatch1'] ,
-                                dictionary_file_pair_analysis[item]['enrichment'],
-                                custom_format)
+
+        if counter_1min_30min == 0:
+            if dictionary_file_pair_analysis[item]['mismatches'] == 1:
+                if dictionary_file_pair_analysis[item]['mismatch1'] != 'NA':
+                    worksheet_single_heat.write(base_num_dict[   item[dictionary_file_pair_analysis[item]['mismatch1']]   ] + single_heat_row + 1,
+                                    dictionary_file_pair_analysis[item]['mismatch1'] * 2 ,
+                                    dictionary_file_pair_analysis[item]['enrichment'],
+                                    custom_format)
+        if counter_1min_30min == 1:
+            if dictionary_file_pair_analysis[item]['mismatches'] == 1:
+                if dictionary_file_pair_analysis[item]['mismatch1'] != 'NA':
+                    worksheet_single_heat.write(
+                        base_num_dict[item[dictionary_file_pair_analysis[item]['mismatch1']]] + single_heat_row + 1,
+                        (dictionary_file_pair_analysis[item]['mismatch1'] *2 ) + 1,
+                        dictionary_file_pair_analysis[item]['enrichment'],
+                        custom_format)
 
     worksheet_single_heat.write(single_heat_row -1, 0, file_name)
 
     for item in base_num_dict:
-        worksheet_single_heat.write(base_num_dict[item] + single_heat_row + 1 ,24,item)
+        worksheet_single_heat.write(base_num_dict[item] + single_heat_row + 1 ,48,item)
     column = 0
     for base in perfect_target_list:
         worksheet_single_heat.write(single_heat_row, column, base)
         column += 1
 
     for num in range(1000):
-        worksheet_single_heat.set_row(num, 15)
-    worksheet_single_heat.set_column(0, 100, 2.2)
+        worksheet_single_heat.set_row(num, 45)
+    worksheet_single_heat.set_column(0, 100, 3.4)
 
-    worksheet_single_heat.conditional_format(single_heat_row + 1, 0, single_heat_row + 4, 23,
+    worksheet_single_heat.conditional_format(0, 0, 1000, 1000,
                                              {'type': '2_color_scale', 'min_color': 'white', 'max_color': 'red'})
-    single_heat_row += 7
+
+    if counter_1min_30min == 1:
+        double_heat_row += 27
+        counter_1min_30min = 0
+        single_heat_row += 7
+    else:
+        counter_1min_30min += 1
 
 
-
-
+#writing more info in each separate sheet for each sample
 
     for num in range(100):
         worksheet.set_row(num, 15)
@@ -386,15 +495,21 @@ for pair in total_file_list_pairs:
         column += 1
 
 
+#writing enrichment of random NT sequences
+    column = 1
+    worksheet_all.write(row_random_seq, column, file_name)
+    column += 1
 
-
+    for item in dictionary_file_pair_analysis:
+        if dictionary_file_pair_analysis[item]['random'] == True:
+            print(item,dictionary_file_pair_analysis[item]['enrichment'])
+            worksheet_all.write(row_random_seq,column,dictionary_file_pair_analysis[item]['enrichment'])
+            column += 1
+    row_random_seq += 1
 
 
 worksheet_all.write_column('A1', all_sample_info)
 workbook.close()
-
-
-
 
 
 
