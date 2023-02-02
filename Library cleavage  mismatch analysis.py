@@ -117,6 +117,7 @@ def file_pair_analysis(file_pair, random_list, control = False):
             seq_count_lib[item]['mm_combo'] = "perfect"
 
 
+
     if control == False:
         for item in seq_count_lib:
             if item in analysis_control_lib_combined:
@@ -139,7 +140,20 @@ def file_pair_analysis(file_pair, random_list, control = False):
         for item in seq_count_lib:
             seq_count_lib[item]['z-score'] = seq_count_lib[item]['z_numerator'] / standard_dev_exp
 
+#compensating for the enrichment of random sequences which should not be cut at all
+        random_sum = 0
+        random_count = 0
+        random_average = 0
+        for item in seq_count_lib:
+            if seq_count_lib[item]['random'] == True:
+                random_sum += seq_count_lib[item]['enrichment']
+                random_count +=1
+        random_average = random_sum/random_count
+        print(random_average, 'random average')
 
+        for item in seq_count_lib:  # NOT correcting enrichment of random sequences because we're using random sequences to correct others
+            if seq_count_lib[item]['random'] == False:
+                seq_count_lib[item]['enrichment'] = seq_count_lib[item]['enrichment'] / random_average
     return seq_count_lib
 
 
@@ -174,12 +188,12 @@ print(control_file_list_pairs[0])
 
 analysis_control_lib_combined = {}
 for pair in control_file_list_pairs:
-    print(pair)
+    # print(pair)
     control_lib = file_pair_analysis(pair, random_sequences_list, control = True) #analyzing control files, making library
     if len(control_lib) > 2400:
         for item in control_lib:
             if item in analysis_control_lib_combined:
-                analysis_control_lib_combined[item]['fraction'] += analysis_control_lib_combined[item]['fraction']
+                analysis_control_lib_combined[item]['fraction'] += control_lib[item]['fraction']
                 analysis_control_lib_combined[item]['instances'] += 1
             else:
                 analysis_control_lib_combined[item] = control_lib[item]
@@ -191,9 +205,9 @@ for item in analysis_control_lib_combined:
 
 
 #collecting experimental samples, arranging so 1minute and 30minute samples are next to each other
-exp_file_list_30min = []
-exp_file_list_1min = []
-exp_file_list = []
+# exp_file_list_30min = []
+# exp_file_list_1min = []
+# exp_file_list = []
 # exp_file_list_1min += glob.glob('L_As_Supercoil_1_1*')
 # exp_file_list_30min += glob.glob('L_As_Supercoil_1_30*')
 # exp_file_list_1min += glob.glob('L_As_Supercoil_2_1*')
@@ -202,48 +216,94 @@ exp_file_list = []
 # exp_file_list_30min += glob.glob('L_As_Supercoil_5_30*')
 # exp_file_list_1min += glob.glob('L_As_Supercoil_10_1*')
 # exp_file_list_30min += glob.glob('L_As_Supercoil_10_30*')
-exp_file_list_1min += glob.glob('L_Lb_Supercoil_1_1*')
-exp_file_list_30min += glob.glob('L_Lb_Supercoil_1_30*')
-exp_file_list_1min += glob.glob('L_Lb_Supercoil_2_1*')
-exp_file_list_30min += glob.glob('L_Lb_Supercoil_2_30*')
-exp_file_list_1min += glob.glob('L_Lb_Supercoil_5_1*')
-exp_file_list_30min += glob.glob('L_Lb_Supercoil_5_30*')
-exp_file_list_1min += glob.glob('L_Lb_Supercoil_10_1*')
-exp_file_list_30min += glob.glob('L_Lb_Supercoil_10_30*')
+# exp_file_list_1min += glob.glob('L_Lb_Supercoil_1_1*')
+# exp_file_list_30min += glob.glob('L_Lb_Supercoil_1_30*')
+# exp_file_list_1min += glob.glob('L_Lb_Supercoil_2_1*')
+# exp_file_list_30min += glob.glob('L_Lb_Supercoil_2_30*')
+# exp_file_list_1min += glob.glob('L_Lb_Supercoil_5_1*')
+# exp_file_list_30min += glob.glob('L_Lb_Supercoil_5_30*')
+# exp_file_list_1min += glob.glob('L_Lb_Supercoil_10_1*')
+# exp_file_list_30min += glob.glob('L_Lb_Supercoil_10_30*')
+
 
 # exp_file_list_1min += glob.glob('*1min*')
 # exp_file_list_30min += glob.glob('*30min*')
 
-exp_file_list_1min = [item for item in exp_file_list_1min if 'Li' not in item]
-exp_file_list_1min = [item for item in exp_file_list_1min if 'C1' not in item]
-exp_file_list_1min = [item for item in exp_file_list_1min if 'C2' not in item]
+# exp_file_list_1min = [item for item in exp_file_list_1min if 'Li' not in item]
+# exp_file_list_1min = [item for item in exp_file_list_1min if 'C1' not in item]
+# exp_file_list_1min = [item for item in exp_file_list_1min if 'C2' not in item]
+#
+# exp_file_list_30min = [item for item in exp_file_list_30min if 'Li' not in item]
+# exp_file_list_30min = [item for item in exp_file_list_30min if 'C1' not in item]
+# exp_file_list_30min = [item for item in exp_file_list_30min if 'C2' not in item]
+#
+# # print(exp_file_list_1min)
+#
+# file_list_length_half = int(len(exp_file_list_1min) / 2)
+# total_file_list_pairs_1min = [] #this list will contain pairs of files ordered by their order in total file list, check the list is in order
+# total_file_list_pairs_30min = []
+#
+#
+# for x in range(file_list_length_half):
+#     total_file_list_pairs_1min.append([exp_file_list_1min[2 * x]] + [exp_file_list_1min[2 * x + 1]])
+#     total_file_list_pairs_30min.append([exp_file_list_30min[2 * x]] + [exp_file_list_30min[2 * x + 1]])
+#
+#
+#
+# total_file_list_pairs = []
+# if len(total_file_list_pairs_1min) == len(total_file_list_pairs_30min):
+#     for pos in range(len(total_file_list_pairs_1min)):
+#         total_file_list_pairs.append(total_file_list_pairs_1min[pos])
+#         total_file_list_pairs.append(total_file_list_pairs_30min[pos])
 
-exp_file_list_30min = [item for item in exp_file_list_30min if 'Li' not in item]
-exp_file_list_30min = [item for item in exp_file_list_30min if 'C1' not in item]
-exp_file_list_30min = [item for item in exp_file_list_30min if 'C2' not in item]
+# for pos in range(len(total_file_list_pairs)):
+    # print(total_file_list_pairs[pos])
 
-print(exp_file_list_1min)
+file_list = []
+file_list += glob.glob('L_As_Supercoil_1_1*')
+file_list += glob.glob('L_As_Supercoil_2_1*')
+file_list += glob.glob('L_As_Supercoil_5_1*')
+file_list += glob.glob('L_As_Supercoil_10_1*')
+file_list += glob.glob('L_Fn_Supercoil_1_1*')
+file_list += glob.glob('L_Fn_Supercoil_2_1*')
+file_list += glob.glob('L_Fn_Supercoil_5_1*')
+file_list += glob.glob('L_Fn_Supercoil_10_1*')
+file_list += glob.glob('L_Lb_Supercoil_1_1*')
+file_list += glob.glob('L_Lb_Supercoil_2_1*')
+file_list += glob.glob('L_Lb_Supercoil_5_1*')
+file_list += glob.glob('L_Lb_Supercoil_10_1*')
 
-file_list_length_half = int(len(exp_file_list_1min) / 2)
-total_file_list_pairs_1min = [] #this list will contain pairs of files ordered by their order in total file list, check the list is in order
-total_file_list_pairs_30min = []
+file_list += glob.glob('L_As_Supercoil_1_30*')
+file_list += glob.glob('L_As_Supercoil_2_30*')
+file_list += glob.glob('L_As_Supercoil_5_30*')
+file_list += glob.glob('L_As_Supercoil_10_30*')
+file_list += glob.glob('L_Fn_Supercoil_1_30*')
+file_list += glob.glob('L_Fn_Supercoil_2_30*')
+file_list += glob.glob('L_Fn_Supercoil_5_30*')
+file_list += glob.glob('L_Fn_Supercoil_10_30*')
+file_list += glob.glob('L_Lb_Supercoil_1_30*')
+file_list += glob.glob('L_Lb_Supercoil_2_30*')
+file_list += glob.glob('L_Lb_Supercoil_5_30*')
+file_list += glob.glob('L_Lb_Supercoil_10_30*')
+
+# file_list += glob.glob('L_As_Nicked_1_1*')
+# file_list += glob.glob('L_As_Nicked_2_1*')
+# file_list += glob.glob('L_As_Nicked_5_1*')
+# file_list += glob.glob('L_As_Nicked_10_1*')
+# file_list += glob.glob('L_Fn_Nicked_1_1*')
+# file_list += glob.glob('L_Fn_Nicked_2_1*')
+# file_list += glob.glob('L_Fn_Nicked_5_1*')
+# file_list += glob.glob('L_Fn_Nicked_10_1*')
+# file_list += glob.glob('L_Lb_Nicked_1_1*')
+# file_list += glob.glob('L_Lb_Nicked_2_1*')
+# file_list += glob.glob('L_Lb_SNicked_5_1*')
+# file_list += glob.glob('L_Lb_Nicked_10_1*')
 
 
-for x in range(file_list_length_half):
-    total_file_list_pairs_1min.append([exp_file_list_1min[2 * x]] + [exp_file_list_1min[2 * x + 1]])
-    total_file_list_pairs_30min.append([exp_file_list_30min[2 * x]] + [exp_file_list_30min[2 * x + 1]])
-
-
-
+file_list_length_half = int(len(file_list) / 2)
 total_file_list_pairs = []
-if len(total_file_list_pairs_1min) == len(total_file_list_pairs_30min):
-    for pos in range(len(total_file_list_pairs_1min)):
-        total_file_list_pairs.append(total_file_list_pairs_1min[pos])
-        total_file_list_pairs.append(total_file_list_pairs_30min[pos])
-
-for pos in range(len(total_file_list_pairs)):
-    print(total_file_list_pairs[pos])
-
+for x in range(file_list_length_half):
+    total_file_list_pairs.append([file_list[2 * x]] + [file_list[2 * x + 1]])
 
 all_sample_info = [] # this will be written on the firstsheet containing info for all of the samples processed
 
@@ -260,8 +320,8 @@ double_heat_row = 2
 
 counter_1min_30min = 0 #keeps track of alternating 1min and 30minute samples for heat maps
 
-row_random_seq = 0
-
+row_file_pair = 1
+triplicate_count = 0
 for pair in total_file_list_pairs:
     file_name = pair[0][0:22]
     print(file_name)
@@ -324,8 +384,8 @@ for pair in total_file_list_pairs:
             enrich_dict[dictionary_file_pair_analysis[item]['mm_combo']][2] += dictionary_file_pair_analysis[item]['enrichment']
             enrich_dict[dictionary_file_pair_analysis[item]['mm_combo']][3] = enrich_dict[dictionary_file_pair_analysis[item]['mm_combo']][2] / enrich_dict[dictionary_file_pair_analysis[item]['mm_combo']][1]
 
-    print(enrich_dict)
-    print(singles_enrich_dict)
+    # print(enrich_dict)
+    # print(singles_enrich_dict)
 
 #making 2D heat map for double mismatches
     grid24_list = []
@@ -335,7 +395,7 @@ for pair in total_file_list_pairs:
         for x in range(24):
             zero_list.append(0)
         grid24_list.append(zero_list)
-    print(grid24_list)
+    # print(grid24_list)
 
     row = 1
     column = 49
@@ -347,7 +407,7 @@ for pair in total_file_list_pairs:
     for item in dictionary_file_pair_analysis:
         if dictionary_file_pair_analysis[item]['mismatch1'] != 'NA' and dictionary_file_pair_analysis[item]['mismatch2'] != 'NA':
             grid24_list[dictionary_file_pair_analysis[item]['mismatch1']][dictionary_file_pair_analysis[item]['mismatch2']] += dictionary_file_pair_analysis[item]['enrichment']
-    print(grid24_list)
+    # print(grid24_list)
 
 
     if counter_1min_30min == 0: # 1 minutes samples
@@ -496,21 +556,78 @@ for pair in total_file_list_pairs:
 
 
 #writing enrichment of random NT sequences
-    column = 1
-    worksheet_all.write(row_random_seq, column, file_name)
-    column += 1
+    column = 0
+    worksheet_all.write(row_file_pair, column, file_name)
 
-    for item in dictionary_file_pair_analysis:
-        if dictionary_file_pair_analysis[item]['random'] == True:
-            print(item,dictionary_file_pair_analysis[item]['enrichment'])
-            worksheet_all.write(row_random_seq,column,dictionary_file_pair_analysis[item]['enrichment'])
-            column += 1
-    row_random_seq += 1
+    if triplicate_count == 0:
+        triplicate_dict = {}
+        random_trip_dict = {}
+        for item in enrich_dict:
+            triplicate_dict[item] = {'replicates':[], 'average':0,'stdev':0}
+        for item in dictionary_file_pair_analysis:
+            if dictionary_file_pair_analysis[item]['random'] == True:
+                random_trip_dict[item] = {'replicates':[], 'average':0,'stdev':0}
+
+    if triplicate_count != 3:
+        for item in enrich_dict:
+            triplicate_dict[item]['replicates'].append(enrich_dict[item][3])
+        for item in dictionary_file_pair_analysis:
+            if dictionary_file_pair_analysis[item]['random'] == True:
+                random_trip_dict[item]['replicates'].append(dictionary_file_pair_analysis[item]['enrichment'])
+
+        #     random_seq_enrich_list = []
+        #     if dictionary_file_pair_analysis[item]['random'] == True:
+        #         random_seq_enrich_list.append(dictionary_file_pair_analysis[item]['enrichment'])
+        #
+        # if dictionary_file_pair_analysis[item]['random'] == True:
+        # random_trip_dict[item]['replicates'].append(statistics.mean(random_seq_enrich_list))
 
 
-worksheet_all.write_column('A1', all_sample_info)
+    triplicate_count += 1
+    if triplicate_count == 3:
+        triplicate_count = 0
+        for item in triplicate_dict:
+            triplicate_dict[item]['average'] = statistics.mean(triplicate_dict[item]['replicates'])
+            triplicate_dict[item]['stdev'] = statistics.stdev(triplicate_dict[item]['replicates'])
+        for item in random_trip_dict:
+            random_trip_dict[item]['average'] = statistics.mean(random_trip_dict[item]['replicates'])
+            random_trip_dict[item]['stdev'] = statistics.stdev(random_trip_dict[item]['replicates'])
+
+
+        sortable_list = []
+        for item in triplicate_dict:
+            sortable_list.append([item, triplicate_dict[item]['average'], triplicate_dict[item]['stdev']])
+        sortable_list.sort()
+        if row_file_pair == 1: # meaning it's the first file processed
+            for item in sortable_list:
+                worksheet_all.write(0, column+3, item[0])
+                column += 2
+        column = 2
+        for item in sortable_list: # writing enrichment for mismatch categories
+            worksheet_all.write(row_file_pair,column+1,item[1])
+            worksheet_all.write(row_file_pair, column+2, item[2])
+            column += 2
+
+        rand_avg_list = []
+        for item in random_trip_dict:
+            rand_avg_list.append(random_trip_dict[item]['average'])
+
+        worksheet_all.write(row_file_pair, 1, statistics.mean(rand_avg_list)) # writing random sequence enrichemtn
+        worksheet_all.write(row_file_pair, 2, statistics.stdev(rand_avg_list))
+        row_file_pair += 1
+
+
+    # for item in dictionary_file_pair_analysis:
+    #     if dictionary_file_pair_analysis[item]['random'] == True:
+    #         print(item,dictionary_file_pair_analysis[item]['enrichment'])
+    #         worksheet_all.write(row_random_seq,column,dictionary_file_pair_analysis[item]['enrichment'])
+    #         column += 1
+    # row_random_seq += 1
+
+
+# worksheet_all.write_column('A1', all_sample_info)
+print(file_list)
 workbook.close()
-
 
 
 
