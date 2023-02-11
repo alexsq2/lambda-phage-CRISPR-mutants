@@ -140,7 +140,7 @@ def file_pair_analysis(file_pair, random_list, control = False):
         for item in seq_count_lib:
             seq_count_lib[item]['z-score'] = seq_count_lib[item]['z_numerator'] / standard_dev_exp
 
-#compensating for the enrichment of random sequences which should not be cut at all
+#compensating for the enrichment of random sequences if they are present in supercoiled fraction in controls
         if 'Supercoil' in file_pair[0] and 'Supercoil' in file_pair[1]:
             random_sum = 0
             random_count = 0
