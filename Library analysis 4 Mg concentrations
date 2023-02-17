@@ -1,3 +1,8 @@
+#script only works for gene J targets (398) unless "to_find" sequences are switched out
+# skeleton of script that checks R1 and R2 files to see if they match
+
+
+
 
 import xlsxwriter
 import glob
@@ -140,7 +145,7 @@ def file_pair_analysis(file_pair, random_list, control = False):
         for item in seq_count_lib:
             seq_count_lib[item]['z-score'] = seq_count_lib[item]['z_numerator'] / standard_dev_exp
 
-#compensating for the enrichment of random sequences if they are present in supercoiled fraction in controls
+#compensating for the enrichment of random sequences which should not be cut at all
         if 'Supercoil' in file_pair[0] and 'Supercoil' in file_pair[1]:
             random_sum = 0
             random_count = 0
@@ -287,7 +292,7 @@ file_list_length_half = int(len(file_list) / 2)
 total_file_list_pairs = []
 for x in range(file_list_length_half):
     total_file_list_pairs.append([file_list[2 * x]] + [file_list[2 * x + 1]])
-
+print(total_file_list_pairs)
 all_sample_info = [] # this will be written on the firstsheet containing info for all of the samples processed
 
 custom_format = workbook.add_format({'num_format': ';;;'})
@@ -316,7 +321,9 @@ four_mg_condition_count = 0
 list_of_trip_dictionaries = []
 triplicate_dict_combined = {}
 list_of_four_mg_dicts = []
-#combining three replicates into one combine dictionary
+list_trip_dicts_enrichment = [] # will be used for plotting raw enrichment values for each 1mM Mg sample
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#combining four magnesium concentrations into heat map
 for pair in total_file_list_pairs:
 
     if replicate_trip_count == 0:
@@ -337,6 +344,9 @@ for pair in total_file_list_pairs:
         for item in triplicate_dict_combined:
             triplicate_dict_combined[item]['enrichment'] = triplicate_dict_combined[item]['enrichment']/triplicate_dict_combined[item]['instances']
         list_of_four_mg_dicts.append(triplicate_dict_combined)
+        #adding only 1mM samples to list_all_trip_dictionaries
+        if ('Nicked_1' in pair[0] and 'Nicked_1' in pair[1]) or ('Supercoil_1' in pair[0] and 'Supercoil_1' in pair[1]) :
+            list_trip_dicts_enrichment.append([triplicate_dict_combined,pair])
         print(len(list_of_trip_dictionaries), 'trip dictionaries')
         #resetting all triplicate stuff
         replicate_trip_count = 0
@@ -448,6 +458,7 @@ for pair in total_file_list_pairs:
                     worksheet_4mg.write(row, column, num)
                     column += 1
 
+#making 2D heat map for double mismatches
             for item in four_mg_dict:
                 if four_mg_dict[item]['mismatch1'] != 'NA' and four_mg_dict[item]['mismatch2'] != 'NA':
                     grid24_list[four_mg_dict[item]['mismatch1']][four_mg_dict[item]['mismatch2']][0] += four_mg_dict[item]['mg_sum']
@@ -479,5 +490,158 @@ for pair in total_file_list_pairs:
                                               'min_value': -1*range_heat_map, 'mid_value': 0,'max_value': range_heat_map,
                                               'min_type': 'num','mid_type': 'num','max_type': 'num',})
 
+#making heat map for single mismatches only
+            perfect_target_list = list(perfect_target)
+            row = 9
+            column = 35
+            for base in perfect_target_list:
+                worksheet_4mg.write(row, column, base)
+                column += 1
+            base_num_dict = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
+            for item in base_num_dict:
+                worksheet_4mg.write(base_num_dict[item] + 10, 34, item)
+            row = 10
+            column = 35
+            for item in four_mg_dict:
+                if four_mg_dict[item]['mismatches'] == 1:
+                    if four_mg_dict[item]['mismatch1'] != 'NA':
+                        worksheet_4mg.write(base_num_dict[item[four_mg_dict[item]['mismatch1']]] + row,
+                                        four_mg_dict[item]['mismatch1'] + column,
+                                        four_mg_dict[item]['mg_sum'],
+                                        custom_format)
 
+            worksheet_4mg.conditional_format(10, 35, 15, 60,
+                                             {'type': '3_color_scale', 'min_color': 'red', 'mid_color': 'white',
+                                              'max_color': 'blue',
+                                              'min_value': -1 * range_heat_map, 'mid_value': 0,
+                                              'max_value': range_heat_map,
+                                              'min_type': 'num', 'mid_type': 'num', 'max_type': 'num', })
+
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#writing enrichment values for 1mM samples only
+for dict in list_trip_dicts_enrichment: # this has 2 item lists with index 0 as the dict, and 1 as the file name
+    worksheet_enrich_only = workbook.add_worksheet(dict[1][0][:22]+'enrich')
+    sample_dict = dict[0]
+    for item in sample_dict:
+
+        mm_count_temp = 0
+        mm_pos_1 = 'NA'
+        mm_bin_1 = 'NA'
+        mm_pos_2 = 'NA'
+        mm_bin_2 = 'NA'
+
+        for x in range(len(item)):  # counting total mismatches
+            if item[x] != perfect_target[x]:
+                mm_count_temp += 1
+                if mm_count_temp == 1:
+                    mm_pos_1 = x
+                    for region in target_regions:
+                        if x in target_regions[region]:
+                            mm_bin_1 = region
+                if mm_count_temp == 2:
+                    mm_pos_2 = x
+                    for region in target_regions:
+                        if x in target_regions[region]:
+                            mm_bin_2 = region
+        if mm_count_temp < 3:
+            sample_dict[item]['length'] = len(item)
+            sample_dict[item]['mismatches'] = mm_count_temp
+            sample_dict[item]['mismatch1'] = mm_pos_1
+            sample_dict[item]['mismatch2'] = mm_pos_2
+            sample_dict[item]['mm_bin_1'] = mm_bin_1
+            sample_dict[item]['mm_bin_2'] = mm_bin_2
+            sample_dict[item]['random'] = item in random_sequences_list
+
+        if mm_count_temp > 3 and item in random_sequences_list:
+            sample_dict[item]['length'] = len(item)
+            sample_dict[item]['mismatches'] = mm_count_temp
+            sample_dict[item]['mismatch1'] = mm_pos_1
+            sample_dict[item]['mismatch2'] = mm_pos_2
+            sample_dict[item]['mm_bin_1'] = mm_bin_1
+            sample_dict[item]['mm_bin_2'] = mm_bin_2
+            sample_dict[item]['random'] = item in random_sequences_list
+
+# making 2D heat map with mg dependent enrichment change
+    grid24_list = []
+
+    for x in range(24):
+        zero_list = []
+        for x in range(24):
+            zero_list.append([0, 0])
+        grid24_list.append(zero_list)
+    # print(grid24_list)
+
+    row = 8
+    column = 7
+    for num in range(-4, 21):
+        if num != 0:
+            worksheet_enrich_only.write(row, column, num)
+            row += 1
+
+    row = 7
+    column = 8
+    for num in range(-4, 21):
+        if num != 0:
+            worksheet_enrich_only.write(row, column, num)
+            column += 1
+
+    # making 2D heat map for double mismatches
+    for item in sample_dict:
+        if sample_dict[item]['mismatch1'] != 'NA' and sample_dict[item]['mismatch2'] != 'NA':
+            grid24_list[sample_dict[item]['mismatch1']][sample_dict[item]['mismatch2']][0] += sample_dict[item]['enrichment']
+            grid24_list[sample_dict[item]['mismatch1']][sample_dict[item]['mismatch2']][1] += 1
+
+    for x in range(24):
+        for y in range(24):
+            if grid24_list[x][y][1] > 0:
+                grid24_list[x][y][0] = grid24_list[x][y][0] / grid24_list[x][y][1]
+        # print(grid24_list)
+
+    grid24_values_list = []
+    for x in range(24):
+        for y in range(24):
+            grid24_values_list.append(grid24_list[x][y][0])
+    min_value_heat_map = min(grid24_values_list)
+    max_value_heat_map = max(grid24_values_list)
+    range_heat_map = max(-min_value_heat_map, max_value_heat_map)
+
+    for row in range(len(grid24_list)):
+        for column in range(len(grid24_list)):
+            worksheet_enrich_only.write(row + 8, column + 8, grid24_list[row][column][0], custom_format)
+    for num in range(200):
+        worksheet_enrich_only.set_row(num, 14.5)
+    worksheet_enrich_only.set_column(0, 100, 2.18)
+
+    worksheet_enrich_only.conditional_format(8, 8, 32, 32,
+                                     {'type': '3_color_scale', 'min_color': 'red', 'mid_color': 'white',
+                                      'max_color': 'blue',
+                                      'min_value': -1 * range_heat_map, 'mid_value': 0, 'max_value': range_heat_map,
+                                      'min_type': 'num', 'mid_type': 'num', 'max_type': 'num', })
+
+    # making heat map for single mismatches only
+    perfect_target_list = list(perfect_target)
+    row = 9
+    column = 35
+    for base in perfect_target_list:
+        worksheet_enrich_only.write(row, column, base)
+        column += 1
+    base_num_dict = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
+    for item in base_num_dict:
+        worksheet_enrich_only.write(base_num_dict[item] + 10, 34, item)
+    row = 10
+    column = 35
+    for item in sample_dict:
+        if sample_dict[item]['mismatches'] == 1:
+            if sample_dict[item]['mismatch1'] != 'NA':
+                worksheet_enrich_only.write(base_num_dict[item[sample_dict[item]['mismatch1']]] + row,
+                                    sample_dict[item]['mismatch1'] + column,
+                                    sample_dict[item]['enrichment'],
+                                    custom_format)
+
+    worksheet_enrich_only.conditional_format(10, 35, 15, 60,
+                                     {'type': '3_color_scale', 'min_color': 'red', 'mid_color': 'white',
+                                      'max_color': 'blue',
+                                      'min_value': -1 * range_heat_map, 'mid_value': 0,
+                                      'max_value': range_heat_map,
+                                      'min_type': 'num', 'mid_type': 'num', 'max_type': 'num', })
 workbook.close()
