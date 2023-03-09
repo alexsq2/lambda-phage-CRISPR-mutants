@@ -1,6 +1,4 @@
-#script only works for gene J targets (398) unless "to_find" sequences are switched out
-# skeleton of script that checks R1 and R2 files to see if they match
-
+#script only works for gene L targets (478) unless "to_find" sequences are switched out
 
 
 
@@ -247,7 +245,7 @@ file_list += glob.glob('L_Lb_Supercoil_1_1*')
 file_list += glob.glob('L_Lb_Supercoil_2_1*')
 file_list += glob.glob('L_Lb_Supercoil_5_1*')
 file_list += glob.glob('L_Lb_Supercoil_10_1*')
-
+#
 file_list += glob.glob('L_As_Supercoil_1_30*')
 file_list += glob.glob('L_As_Supercoil_2_30*')
 file_list += glob.glob('L_As_Supercoil_5_30*')
@@ -260,7 +258,7 @@ file_list += glob.glob('L_Lb_Supercoil_1_30*')
 file_list += glob.glob('L_Lb_Supercoil_2_30*')
 file_list += glob.glob('L_Lb_Supercoil_5_30*')
 file_list += glob.glob('L_Lb_Supercoil_10_30*')
-
+#
 file_list += glob.glob('L_As_Nicked_1_1*')
 file_list += glob.glob('L_As_Nicked_2_1*')
 file_list += glob.glob('L_As_Nicked_5_1*')
@@ -273,7 +271,7 @@ file_list += glob.glob('L_Lb_Nicked_1_1*')
 file_list += glob.glob('L_Lb_Nicked_2_1*')
 file_list += glob.glob('L_Lb_Nicked_5_1*')
 file_list += glob.glob('L_Lb_Nicked_10_1*')
-
+#
 file_list += glob.glob('L_As_Nicked_1_30*')
 file_list += glob.glob('L_As_Nicked_2_30*')
 file_list += glob.glob('L_As_Nicked_5_30*')
@@ -298,6 +296,7 @@ all_sample_info = [] # this will be written on the firstsheet containing info fo
 custom_format = workbook.add_format({'num_format': ';;;'})
 
 #making worksheets containing info from all of the samples
+worksheet_bar_graph_values = workbook.add_worksheet('bar graphs')
 worksheet_all = workbook.add_worksheet('All info')
 row=0
 column = 0
@@ -322,6 +321,7 @@ list_of_trip_dictionaries = []
 triplicate_dict_combined = {}
 list_of_four_mg_dicts = []
 list_trip_dicts_enrichment = [] # will be used for plotting raw enrichment values for each 1mM Mg sample
+bar_list_trip_dictionaries = []
 #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #combining four magnesium concentrations into heat map
 for pair in total_file_list_pairs:
@@ -333,20 +333,22 @@ for pair in total_file_list_pairs:
     replicate_trip_count += 1
 
     if replicate_trip_count == 3:
-
+        bar_list_trip_dictionaries.append(  [list_of_trip_dictionaries,pair[0]]  )
         for dict in list_of_trip_dictionaries:
-            for item in dict:
-                if item not in triplicate_dict_combined:
-                    triplicate_dict_combined[item] = dict[item]
-                else:
-                    triplicate_dict_combined[item]['instances'] += 1
-                    triplicate_dict_combined[item]['enrichment'] += dict[item]['enrichment']
+            if len(dict) > 500:
+                for item in dict:
+                    if item not in triplicate_dict_combined:
+                        triplicate_dict_combined[item] = dict[item]
+                    else:
+                        triplicate_dict_combined[item]['instances'] += 1
+                        triplicate_dict_combined[item]['enrichment'] += dict[item]['enrichment']
         for item in triplicate_dict_combined:
             triplicate_dict_combined[item]['enrichment'] = triplicate_dict_combined[item]['enrichment']/triplicate_dict_combined[item]['instances']
+        # print('COMBINED TRIPLICATES DICTS',triplicate_dict_combined)
         list_of_four_mg_dicts.append(triplicate_dict_combined)
         #adding only 1mM samples to list_all_trip_dictionaries
-        if ('Nicked_1' in pair[0] and 'Nicked_1' in pair[1]) or ('Supercoil_1' in pair[0] and 'Supercoil_1' in pair[1]) :
-            list_trip_dicts_enrichment.append([triplicate_dict_combined,pair])
+        # if ('Nicked_1' in pair[0] and 'Nicked_1' in pair[1]) or ('Supercoil_1' in pair[0] and 'Supercoil_1' in pair[1]) :
+        list_trip_dicts_enrichment.append([triplicate_dict_combined,pair])
         print(len(list_of_trip_dictionaries), 'trip dictionaries')
         #resetting all triplicate stuff
         replicate_trip_count = 0
@@ -522,44 +524,45 @@ for pair in total_file_list_pairs:
 for dict in list_trip_dicts_enrichment: # this has 2 item lists with index 0 as the dict, and 1 as the file name
     worksheet_enrich_only = workbook.add_worksheet(dict[1][0][:22]+'enrich')
     sample_dict = dict[0]
-    for item in sample_dict:
-
-        mm_count_temp = 0
-        mm_pos_1 = 'NA'
-        mm_bin_1 = 'NA'
-        mm_pos_2 = 'NA'
-        mm_bin_2 = 'NA'
-
-        for x in range(len(item)):  # counting total mismatches
-            if item[x] != perfect_target[x]:
-                mm_count_temp += 1
-                if mm_count_temp == 1:
-                    mm_pos_1 = x
-                    for region in target_regions:
-                        if x in target_regions[region]:
-                            mm_bin_1 = region
-                if mm_count_temp == 2:
-                    mm_pos_2 = x
-                    for region in target_regions:
-                        if x in target_regions[region]:
-                            mm_bin_2 = region
-        if mm_count_temp < 3:
-            sample_dict[item]['length'] = len(item)
-            sample_dict[item]['mismatches'] = mm_count_temp
-            sample_dict[item]['mismatch1'] = mm_pos_1
-            sample_dict[item]['mismatch2'] = mm_pos_2
-            sample_dict[item]['mm_bin_1'] = mm_bin_1
-            sample_dict[item]['mm_bin_2'] = mm_bin_2
-            sample_dict[item]['random'] = item in random_sequences_list
-
-        if mm_count_temp > 3 and item in random_sequences_list:
-            sample_dict[item]['length'] = len(item)
-            sample_dict[item]['mismatches'] = mm_count_temp
-            sample_dict[item]['mismatch1'] = mm_pos_1
-            sample_dict[item]['mismatch2'] = mm_pos_2
-            sample_dict[item]['mm_bin_1'] = mm_bin_1
-            sample_dict[item]['mm_bin_2'] = mm_bin_2
-            sample_dict[item]['random'] = item in random_sequences_list
+    #truly embarrassing if I don't need to repeat this sequence classification, waste of time
+    # for item in sample_dict:
+    #
+    #     mm_count_temp = 0
+    #     mm_pos_1 = 'NA'
+    #     mm_bin_1 = 'NA'
+    #     mm_pos_2 = 'NA'
+    #     mm_bin_2 = 'NA'
+    #
+    #     for x in range(len(item)):  # counting total mismatches
+    #         if item[x] != perfect_target[x]:
+    #             mm_count_temp += 1
+    #             if mm_count_temp == 1:
+    #                 mm_pos_1 = x
+    #                 for region in target_regions:
+    #                     if x in target_regions[region]:
+    #                         mm_bin_1 = region
+    #             if mm_count_temp == 2:
+    #                 mm_pos_2 = x
+    #                 for region in target_regions:
+    #                     if x in target_regions[region]:
+    #                         mm_bin_2 = region
+    #     if mm_count_temp < 3:
+    #         sample_dict[item]['length'] = len(item)
+    #         sample_dict[item]['mismatches'] = mm_count_temp
+    #         sample_dict[item]['mismatch1'] = mm_pos_1
+    #         sample_dict[item]['mismatch2'] = mm_pos_2
+    #         sample_dict[item]['mm_bin_1'] = mm_bin_1
+    #         sample_dict[item]['mm_bin_2'] = mm_bin_2
+    #         sample_dict[item]['random'] = item in random_sequences_list
+    #
+    #     if mm_count_temp > 3 and item in random_sequences_list:
+    #         sample_dict[item]['length'] = len(item)
+    #         sample_dict[item]['mismatches'] = mm_count_temp
+    #         sample_dict[item]['mismatch1'] = mm_pos_1
+    #         sample_dict[item]['mismatch2'] = mm_pos_2
+    #         sample_dict[item]['mm_bin_1'] = mm_bin_1
+    #         sample_dict[item]['mm_bin_2'] = mm_bin_2
+    #         sample_dict[item]['random'] = item in random_sequences_list
 
 # making 2D heat map with mg dependent enrichment change
     grid24_list = []
@@ -630,6 +633,7 @@ for dict in list_trip_dicts_enrichment: # this has 2 item lists with index 0 as 
         worksheet_enrich_only.write(base_num_dict[item] + 10, 34, item)
     row = 10
     column = 35
+    range_heat_map_singles = 0
     for item in sample_dict:
         if sample_dict[item]['mismatches'] == 1:
             if sample_dict[item]['mismatch1'] != 'NA':
@@ -637,11 +641,62 @@ for dict in list_trip_dicts_enrichment: # this has 2 item lists with index 0 as 
                                     sample_dict[item]['mismatch1'] + column,
                                     sample_dict[item]['enrichment'],
                                     custom_format)
+                if sample_dict[item]['enrichment'] > range_heat_map_singles:
+                    range_heat_map_singles = sample_dict[item]['enrichment']
 
     worksheet_enrich_only.conditional_format(10, 35, 15, 60,
                                      {'type': '3_color_scale', 'min_color': 'red', 'mid_color': 'white',
                                       'max_color': 'blue',
-                                      'min_value': -1 * range_heat_map, 'mid_value': 0,
-                                      'max_value': range_heat_map,
+                                      'min_value': -1 * range_heat_map_singles, 'mid_value': 0,
+                                      'max_value': range_heat_map_singles,
                                       'min_type': 'num', 'mid_type': 'num', 'max_type': 'num', })
+
+#################################################################
+#making values for bar graphs
+#first make a dictionary with all of the mm_combos, average and standard deviation
+
+#need to calculate average enrichment for each category for each triplicate
+#then pool the averages for each category and calculate the average again and STDEV
+
+print(len(bar_list_trip_dictionaries))
+row = 1
+column = 1
+for triple in bar_list_trip_dictionaries:
+    triplicate_categories_dict = {}
+    triple_count = 0
+    for dict in triple[0]:
+        single_dict_categories = {}
+        for sequence in dict:
+            if dict[sequence]['mm_combo'] not in single_dict_categories:
+                single_dict_categories[dict[sequence]['mm_combo']] = [   dict[sequence]['enrichment']   ]
+            else:
+                single_dict_categories[dict[sequence]['mm_combo']].append( dict[sequence]['enrichment'])
+        single_dict_average = {}
+
+
+        for category in single_dict_categories:
+            if len(single_dict_categories[category]) != 1:
+                single_dict_average[category] = statistics.mean(single_dict_categories[category])
+            else:
+                single_dict_average[category] = single_dict_categories[category][0]
+        triplicate_list_sortable = []
+        for item in single_dict_average:
+            triplicate_list_sortable.append([item,single_dict_average[item]])
+        triplicate_list_sortable.sort()
+        if triple_count == 0:
+            for item in triplicate_list_sortable:
+                worksheet_bar_graph_values.write(row, 0, item[0])
+                row += 1
+            row = 1
+            worksheet_bar_graph_values.write(0, column, triple[1][0:18])
+        for category in triplicate_list_sortable:
+            worksheet_bar_graph_values.write(row, column, category[1])
+            row += 1
+        row = 1
+        column += 1
+        triple_count += 1
+        if triple_count == 3:
+            triple_count = 0
+
+
 workbook.close()
